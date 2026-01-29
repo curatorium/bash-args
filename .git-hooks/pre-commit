@@ -1,0 +1,18 @@
+#!/bin/bash
+# Copyright (c) 2025 Mihai Stancu (https://github.com/curatorium)
+
+set -Eeuo pipefail;
+shopt -s inherit_errexit;
+
+REPO="$(git rev-parse --show-toplevel)"
+
+# ShellCheck
+for file in args test; do
+  shellcheck -x "$REPO/$file" ||
+      (echo "ERROR: $file failed shellcheck." && exit 3);
+done
+
+# Tests
+"$REPO/args.test" > "$REPO/args.test.md" &&
+[[ "$("$REPO/args.test")" == "$(cat "$REPO/args.test.md")" ]] ||
+    (echo "ERROR: args.test tests failed." && exit 3);

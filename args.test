@@ -19,9 +19,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1;
-source ./libs/test;
-source ./libs/args;
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1;
+source ./test;
+source ./args;
 
 # args:flag Tests
 #------------------------------------------------------------------------------
