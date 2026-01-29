@@ -1,0 +1,165 @@
+#!/bin/bash
+# Copyright (c) 2025 Mihai Stancu (https://github.com/curatorium)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# @name flag
+# @type function
+#
+# @flag [-r|--required]	Make the flag required.
+# @arg  <long>			Long name of the flag.
+# @arg  <short>			Short (1 letter) name of the flag. Use "" for long-only.
+# @opt  [--err msg]		Error message on failure.
+#
+# @return 0 when found or optional
+# @return 1 when absent and required
+function args:flag() {
+	# shellcheck disable=SC2178
+	local -n TOKENS="ARGS";
+	local required="false"; [[ "${1:-}" == "-r" || "${1:-}" == "--required" ]] && required="true" && shift;
+	local -n value="${1//[^_0-9a-zA-Z]/_}";
+	local long="${1?usage: flag [-r|--required] <long> <short> [--err msg]}"; shift;
+	local short="${1?usage: flag [-r|--required] <long> <short> [--err msg]}"; shift;
+	local err=""; [[ "${1:-}" == "--err" ]] && shift && err="${1:-}";
+
+	local item items=();
+	for item in "${TOKENS[@]}"; do
+		[[ (-n "$short" && "$item" == "-$short") || "$item" == "--$long" ]] && value="true" || items+=("$item");
+	done
+
+	# rewrite the $TOKENS array without the captured tokens
+	TOKENS=("${items[@]}");
+
+	[[ "$value" == "true" || "$required" == "false" ]] && return 0;
+	[[ -n "$err" ]] && echo "$err" >&2;
+	return 1;
+}
+
+# @name opt
+# @type function
+#
+# @flag [-r|--required]	Make the option required.
+# @arg  <long>			Long name of the option.
+# @arg  <short>			Short (1 letter) name of the option. Use "" for long-only.
+# @arg  [pattern]		RegEx pattern to validate value. Default "(.*)".
+# @opt  [--err msg]		Error message on failure.
+#
+# @return 0 when found and matches or absent and optional
+# @return 1 when absent and required or found and mismatched
+function args:opt() {
+	# shellcheck disable=SC2178
+	local -n TOKENS="ARGS";
+	local required="false"; [[ "${1:-}" == "-r" || "${1:-}" == "--required" ]] && required="true" && shift;
+	local -n value="${1?usage: opt [-r|--required] <long> <short> [pattern] [--err msg]}";
+	local long="${1}"; shift;
+	local short="${1?usage: opt [-r|--required] <long> <short> [pattern] [--err msg]}"; shift;
+	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
+	local pattern="${1:-(.*)}"; shift || true;
+
+	local i item="" captured="" found="false" matched="false" items=();
+	for ((i=0; i<${#TOKENS[@]}; i++)); do
+		item="${TOKENS[i]}";
+
+		if [[ -n "$short" && "$item" =~ ^-${short}(.+)$ ]]; then
+			found="true"; captured="${BASH_REMATCH[1]}";
+			[[ "$captured" =~ $pattern ]] && matched="true" && value="${BASH_REMATCH[1]:-$captured}";
+		elif [[ "$item" =~ ^--${long}=(.*)$ ]]; then
+			found="true"; captured="${BASH_REMATCH[1]}";
+			[[ "$captured" =~ $pattern ]] && matched="true" && value="${BASH_REMATCH[1]:-$captured}";
+		elif [[ (-n "$short" && "$item" == "-$short") || "$item" == "--$long" ]]; then
+			found="true"; captured="${TOKENS[i+1]:-}";
+			[[ "$captured" =~ $pattern ]] && matched="true" && value="${BASH_REMATCH[1]:-$captured}";
+			((i++));
+		else
+			items+=("$item");
+		fi
+	done
+
+	# rewrite the $TOKENS array without the captured tokens
+	TOKENS=("${items[@]}");
+
+	[[ ("$found" == "true" && "$matched" == "true") || ("$found" == "false" && "$required" == "false") ]] && return 0;
+	[[ -n "$err" ]] && echo "$err" >&2;
+	return 1;
+}
+
+# @name arg
+# @type function
+#
+# @flag [-o|--optional]	Make the argument optional.
+# @arg  <name>			Name of variable to be assigned the found value.
+# @arg  [pattern]		RegEx pattern to validate value. Default "(.*)".
+# @opt  [--err <msg>]	Error message on failure.
+#
+# @return 0 when found and matches or absent and optional
+# @return 1 when absent and required or found and mismatched
+function args:arg() {
+	# shellcheck disable=SC2178
+	local -n TOKENS="ARGS";
+	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
+	local -n value="${1?usage: arg [-o|--optional] <ref> [pattern] [--err <msg>]}"; shift;
+	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
+	local pattern="${1:-(.*)}"; shift || true;
+
+	if ((${#TOKENS[@]} < 1)); then
+		[[ "$optional" == "true" ]] && return 0;
+		[[ -n "$err" ]] && echo "$err" >&2;
+		return 1;
+	fi
+
+	local captured="${TOKENS[0]}";
+	if [[ ! "$captured" =~ $pattern ]]; then
+		[[ "$optional" == "true" ]] && return 0;
+		[[ -n "$err" ]] && echo "$err" >&2;
+		return 1;
+	fi
+
+	value="${BASH_REMATCH[1]:-$captured}";
+
+	# rewrite the $TOKENS array without the captured tokens
+	TOKENS=("${TOKENS[@]:1}");
+}
+
+# @name varg
+# @type function
+#
+# @flag [-o|--optional]	Make the arguments optional.
+# @arg  <name>			Name of array variable to capture remaining values.
+# @opt  [--err <msg>]		Error message on failure.
+#
+# @return 0 when at least one arg found or optional
+# @return 1 when no args and required
+function args:varg() {
+	# shellcheck disable=SC2178
+	local -n TOKENS="ARGS";
+	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
+	local -n value="${1?usage: varg [-o|--optional] <ref> [--err msg]}"; shift;
+	local err=""; [[ "${1:-}" == "--err" ]] && shift && err="${1:-}";
+
+	if ((${#TOKENS[@]} < 1)); then
+		[[ "$optional" == "true" ]] && return 0;
+		[[ -n "$err" ]] && echo "$err" >&2;
+		return 1;
+	fi
+
+	value=("${TOKENS[@]}");
+
+	# rewrite the $TOKENS array without the captured tokens
+	TOKENS=();
+}

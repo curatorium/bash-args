@@ -1,0 +1,738 @@
+#!/bin/bash
+# Copyright (c) 2025 Mihai Stancu (https://github.com/curatorium)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1;
+source ./libs/test;
+source ./libs/args;
+
+# args:flag Tests
+#------------------------------------------------------------------------------
+
+test:flag:smoke:basic-long() {
+	local ARGS=(--verbose);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:flag:smoke:basic-short() {
+	local ARGS=(-v);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:flag:smoke:optional-absent() {
+	local ARGS=();
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "" || return 1;
+}
+
+test:flag:accept:required-found() {
+	local ARGS=(--verbose);
+	local verbose;
+	args:flag -r verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+}
+
+test:flag:accept:required-missing() {
+	local ARGS=();
+	local verbose;
+	args:flag -r verbose v 2>/dev/null && return 1;
+	return 0;
+}
+
+test:flag:accept:required-err-msg() {
+	local ARGS=();
+	local verbose stderr;
+	stderr=$(args:flag -r verbose v --err "missing --verbose" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "missing --verbose" || return 1;
+}
+
+test:flag:accept:long-only() {
+	local ARGS=(--verbose);
+	local verbose;
+	args:flag verbose "" || return 1;
+	assert "$verbose" "true" || return 1;
+}
+
+test:flag:accept:long-only-ignores-short() {
+	local ARGS=(-v);
+	local verbose;
+	args:flag verbose "" || return 1;
+	assert "$verbose" "" || return 1;
+	assert:array-eq ARGS "-v" || return 1;
+}
+
+test:flag:regress:mixed-args() {
+	local ARGS=(-v --other);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq ARGS "--other" || return 1;
+}
+
+test:flag:regress:flag-after-other() {
+	local ARGS=(--other -v);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq ARGS "--other" || return 1;
+}
+
+test:flag:regress:duplicate-flags() {
+	local ARGS=(-v -v);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:flag:regress:equals-syntax-ignored() {
+	local ARGS=(--verbose=true);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "" || return 1;
+	assert:array-eq ARGS "--verbose=true" || return 1;
+}
+
+test:flag:regress:attached-value-ignored() {
+	local ARGS=(-vvalue);
+	local verbose;
+	args:flag verbose v || return 1;
+	assert "$verbose" "" || return 1;
+	assert:array-eq ARGS "-vvalue" || return 1;
+}
+
+# args:opt Tests
+#------------------------------------------------------------------------------
+
+test:opt:smoke:basic-long-space() {
+	local ARGS=(--name foo);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:opt:smoke:basic-short-space() {
+	local ARGS=(-n foo);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:opt:smoke:optional-absent() {
+	local ARGS=();
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "" || return 1;
+}
+
+test:opt:accept:long-equals() {
+	local ARGS=(--name=foo);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+}
+
+test:opt:accept:short-attached() {
+	local ARGS=(-nfoo);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+}
+
+test:opt:accept:required-found() {
+	local ARGS=(--name foo);
+	local name;
+	args:opt -r name n || return 1;
+	assert "$name" "foo" || return 1;
+}
+
+test:opt:accept:required-missing() {
+	local ARGS=();
+	local name;
+	args:opt -r name n 2>/dev/null && return 1;
+	return 0;
+}
+
+test:opt:accept:required-err-msg() {
+	local ARGS=();
+	local name stderr;
+	stderr=$(args:opt -r name n --err "missing --name" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "missing --name" || return 1;
+}
+
+test:opt:accept:pattern-match() {
+	local ARGS=(--port 8080);
+	local port;
+	args:opt port p '^[0-9]+$' || return 1;
+	assert "$port" "8080" || return 1;
+}
+
+test:opt:accept:pattern-mismatch() {
+	local ARGS=(--port abc);
+	local port;
+	args:opt port p '^[0-9]+$' 2>/dev/null && return 1;
+	return 0;
+}
+
+test:opt:accept:long-only() {
+	local ARGS=(--name foo);
+	local name;
+	args:opt name "" || return 1;
+	assert "$name" "foo" || return 1;
+}
+
+test:opt:accept:long-only-ignores-short() {
+	local ARGS=(-n foo);
+	local name;
+	args:opt name "" || return 1;
+	assert "$name" "" || return 1;
+	assert:array-eq ARGS "-n foo" || return 1;
+}
+
+test:opt:accept:capture-group() {
+	local ARGS=(--ord :100);
+	local ord;
+	args:opt ord o '^:([0-9]{3})$' || return 1;
+	assert "$ord" "100" || return 1;
+}
+
+test:opt:regress:empty-via-equals() {
+	local ARGS=(--name=);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:opt:regress:empty-via-space() {
+	local ARGS=(--name "");
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "" || return 1;
+}
+
+test:opt:regress:mixed-args() {
+	local ARGS=(--name foo --other);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+	assert:array-eq ARGS "--other" || return 1;
+}
+
+test:opt:regress:opt-after-other() {
+	local ARGS=(--other --name foo);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo" || return 1;
+	assert:array-eq ARGS "--other" || return 1;
+}
+
+test:opt:regress:missing-value-eol() {
+	local ARGS=(--name);
+	local name;
+	args:opt name n '^.+$' 2>/dev/null && return 1;
+	return 0;
+}
+
+test:opt:regress:short-attached-pattern-match() {
+	local ARGS=(-p8080);
+	local port;
+	args:opt port p '^[0-9]+$' || return 1;
+	assert "$port" "8080" || return 1;
+}
+
+test:opt:regress:short-attached-pattern-mismatch() {
+	local ARGS=(-pabc);
+	local port;
+	args:opt port p '^[0-9]+$' 2>/dev/null && return 1;
+	return 0;
+}
+
+test:opt:regress:pattern-with-err-msg() {
+	local ARGS=(--port abc);
+	local port stderr;
+	stderr=$(args:opt port p '^[0-9]+$' --err "invalid port" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "invalid port" || return 1;
+}
+
+# args:arg Tests
+#------------------------------------------------------------------------------
+
+test:arg:smoke:basic-positional() {
+	local ARGS=(foo);
+	local file;
+	args:arg file || return 1;
+	assert "$file" "foo" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:arg:smoke:required-missing() {
+	local ARGS=();
+	local file;
+	args:arg file 2>/dev/null && return 1;
+	return 0;
+}
+
+test:arg:smoke:optional-missing() {
+	local ARGS=();
+	local file;
+	args:arg -o file || return 1;
+	assert "$file" "" || return 1;
+}
+
+test:arg:accept:pattern-match() {
+	local ARGS=(123);
+	local num;
+	args:arg num '^[0-9]+$' || return 1;
+	assert "$num" "123" || return 1;
+}
+
+test:arg:accept:pattern-mismatch-required() {
+	local ARGS=(abc);
+	local num;
+	args:arg num '^[0-9]+$' 2>/dev/null && return 1;
+	return 0;
+}
+
+test:arg:accept:pattern-mismatch-optional() {
+	local ARGS=(abc);
+	local num;
+	args:arg -o num '^[0-9]+$' || return 1;
+	assert "$num" "" || return 1;
+	assert:array-eq ARGS "abc" || return 1;
+}
+
+test:arg:accept:required-err-msg() {
+	local ARGS=();
+	local file stderr;
+	stderr=$(args:arg file --err "missing file" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "missing file" || return 1;
+}
+
+test:arg:accept:url-pattern-match() {
+	local ARGS=(https://example.com);
+	local url;
+	args:arg url '^https?://' || return 1;
+	assert "$url" "https://example.com" || return 1;
+}
+
+test:arg:accept:url-pattern-mismatch() {
+	local ARGS=(/local/path);
+	local url;
+	args:arg url '^https?://' 2>/dev/null && return 1;
+	return 0;
+}
+
+test:arg:accept:capture-group() {
+	local ARGS=(:100);
+	local ord;
+	args:arg ord '^:([0-9]{3})$' || return 1;
+	assert "$ord" "100" || return 1;
+}
+
+test:arg:regress:first-of-many() {
+	local ARGS=(foo bar baz);
+	local first;
+	args:arg first || return 1;
+	assert "$first" "foo" || return 1;
+	assert:array-eq ARGS "bar baz" || return 1;
+}
+
+test:arg:regress:empty-string() {
+	local ARGS=("");
+	local val;
+	args:arg val || return 1;
+	assert "$val" "" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:arg:regress:flag-like-value() {
+	local ARGS=(--flag);
+	local val;
+	args:arg val || return 1;
+	assert "$val" "--flag" || return 1;
+}
+
+test:arg:regress:optional-skip-non-match() {
+	local ARGS=(abc 123);
+	local num;
+	args:arg -o num '^[0-9]+$' || return 1;
+	assert "$num" "" || return 1;
+	assert:array-eq ARGS "abc 123" || return 1;
+}
+
+test:arg:regress:stdin-marker() {
+	local ARGS=(-);
+	local file;
+	args:arg file || return 1;
+	assert "$file" "-" || return 1;
+}
+
+test:arg:regress:pattern-with-err-msg() {
+	local ARGS=(abc);
+	local num stderr;
+	stderr=$(args:arg num '^[0-9]+$' --err "must be number" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "must be number" || return 1;
+}
+
+# args:varg Tests
+#------------------------------------------------------------------------------
+
+test:varg:smoke:basic-variadic() {
+	local ARGS=(a b c);
+	local files;
+	args:varg files || return 1;
+	assert:array-eq files "a b c" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:varg:smoke:required-missing() {
+	local ARGS=();
+	local files;
+	args:varg files 2>/dev/null && return 1;
+	return 0;
+}
+
+test:varg:smoke:optional-missing() {
+	local ARGS=();
+	local files;
+	args:varg -o files || return 1;
+	assert:array-eq files "" || return 1;
+}
+
+test:varg:accept:single-arg() {
+	local ARGS=(single);
+	local files;
+	args:varg files || return 1;
+	assert:array-eq files "single" || return 1;
+}
+
+test:varg:accept:required-err-msg() {
+	local ARGS=();
+	local files stderr;
+	stderr=$(args:varg files --err "missing files" 2>&1);
+	[[ $? -ne 0 ]] || return 1;
+	assert "$stderr" "missing files" || return 1;
+}
+
+test:varg:accept:optional-present() {
+	local ARGS=(a b c);
+	local files;
+	args:varg -o files || return 1;
+	assert:array-eq files "a b c" || return 1;
+}
+
+test:varg:regress:empty-strings() {
+	local ARGS=("" "" "");
+	local vals;
+	args:varg vals || return 1;
+	assert "${#vals[@]}" "3" || return 1;
+	assert "${vals[0]}" "" || return 1;
+}
+
+test:varg:regress:flag-like-values() {
+	local ARGS=(--flag -x value);
+	local vals;
+	args:varg vals || return 1;
+	assert:array-eq vals "--flag -x value" || return 1;
+}
+
+test:varg:regress:preserves-spaces() {
+	local ARGS=(a "b c" d);
+	local vals;
+	args:varg vals || return 1;
+	assert "${#vals[@]}" "3" || return 1;
+	assert "${vals[1]}" "b c" || return 1;
+}
+
+# Integration Tests
+#------------------------------------------------------------------------------
+
+test:int:flag-opt-arg() {
+	local ARGS=(-v --name foo bar);
+	local verbose name file;
+	args:flag verbose v || return 1;
+	args:opt name n || return 1;
+	args:arg file || return 1;
+	assert "$verbose" "true" || return 1;
+	assert "$name" "foo" || return 1;
+	assert "$file" "bar" || return 1;
+}
+
+test:int:order-independence() {
+	local ARGS=(bar --name foo -v);
+	local verbose name file;
+	args:flag verbose v || return 1;
+	args:opt name n || return 1;
+	args:arg file || return 1;
+	assert "$verbose" "true" || return 1;
+	assert "$name" "foo" || return 1;
+	assert "$file" "bar" || return 1;
+}
+
+test:int:opt-arg-patterns() {
+	local ARGS=(--url https://x.com /local/path);
+	local url path;
+	args:opt url u '^https?://' || return 1;
+	args:arg path || return 1;
+	assert "$url" "https://x.com" || return 1;
+	assert "$path" "/local/path" || return 1;
+}
+
+test:int:flag-varg() {
+	local ARGS=(-v a b c);
+	local verbose files;
+	args:flag verbose v || return 1;
+	args:varg files || return 1;
+	assert "$verbose" "true" || return 1;
+	assert:array-eq files "a b c" || return 1;
+}
+
+test:int:duplicate-opts-last-wins() {
+	local ARGS=(--name foo --name bar);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "bar" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:int:early-exit-required() {
+	local ARGS=();
+	local verbose name;
+	args:flag verbose v || return 1;
+	args:opt -r name n 2>/dev/null && return 1;
+	return 0;
+}
+
+# Edge Case Tests
+#------------------------------------------------------------------------------
+
+test:edge:special-chars() {
+	local ARGS=(--name 'foo;bar');
+	local name;
+	args:opt name n || return 1;
+	assert "$name" 'foo;bar' || return 1;
+}
+
+test:edge:newline-in-value() {
+	local ARGS=(--name $'foo\nbar');
+	local name;
+	args:opt name n || return 1;
+	assert "$name" $'foo\nbar' || return 1;
+}
+
+test:edge:unicode() {
+	local ARGS=(--name '日本語');
+	local name;
+	args:opt name n || return 1;
+	assert "$name" '日本語' || return 1;
+}
+
+test:edge:equals-in-value() {
+	local ARGS=(--name=foo=bar);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "foo=bar" || return 1;
+}
+
+test:edge:spaces-via-equals() {
+	local ARGS=(--name='foo bar');
+	local name;
+	args:opt name n || return 1;
+	assert "$name" 'foo bar' || return 1;
+}
+
+test:edge:hyphen-value() {
+	local ARGS=(--name -);
+	local name;
+	args:opt name n || return 1;
+	assert "$name" "-" || return 1;
+}
+
+# Output
+#------------------------------------------------------------------------------
+
+cat <<MD
+# args Test Results
+
+## args:flag
+
+### Smoke Tests
+Scenario        | Invocation                   | Arguments    | Expected | Status | ✓/✗
+----------------|------------------------------|--------------|----------|--------|----
+basic-long      | args:flag verbose v          | --verbose    | true     |      0 | $(t test:flag:smoke:basic-long)
+basic-short     | args:flag verbose v          | -v           | true     |      0 | $(t test:flag:smoke:basic-short)
+optional-absent | args:flag verbose v          | *(none)*     | ""       |      0 | $(t test:flag:smoke:optional-absent)
+
+### Acceptance Tests
+Scenario                | Invocation                         | Arguments    | Expected | Status | ✓/✗
+------------------------|------------------------------------|--------------| ---------|--------|----
+required-found          | args:flag -r verbose v             | --verbose    | true     |      0 | $(t test:flag:accept:required-found)
+required-missing        | args:flag -r verbose v             | *(none)*     | -        |      1 | $(t test:flag:accept:required-missing)
+required-err-msg        | args:flag -r verbose v --err "..." | *(none)*     | stderr   |      1 | $(t test:flag:accept:required-err-msg)
+long-only               | args:flag verbose ""               | --verbose    | true     |      0 | $(t test:flag:accept:long-only)
+long-only-ignores-short | args:flag verbose ""               | -v           | ""       |      0 | $(t test:flag:accept:long-only-ignores-short)
+
+### Regression Tests
+Scenario               | Invocation          | Arguments        | Expected                     | Status | ✓/✗
+-----------------------|---------------------|------------------|------------------------------|--------|----
+mixed-args             | args:flag verbose v | -v --other       | true, ARGS=(--other)         |      0 | $(t test:flag:regress:mixed-args)
+flag-after-other       | args:flag verbose v | --other -v       | true, ARGS=(--other)         |      0 | $(t test:flag:regress:flag-after-other)
+duplicate-flags        | args:flag verbose v | -v -v            | true, ARGS=()                |      0 | $(t test:flag:regress:duplicate-flags)
+equals-syntax-ignored  | args:flag verbose v | --verbose=true   | "", ARGS=(--verbose=true)    |      0 | $(t test:flag:regress:equals-syntax-ignored)
+attached-value-ignored | args:flag verbose v | -vvalue          | "", ARGS=(-vvalue)           |      0 | $(t test:flag:regress:attached-value-ignored)
+
+---
+
+## args:opt
+
+### Smoke Tests
+Scenario          | Invocation        | Arguments    | Expected | Status | ✓/✗
+------------------|-------------------|--------------|----------|--------|----
+basic-long-space  | args:opt name n   | --name foo   | foo      |      0 | $(t test:opt:smoke:basic-long-space)
+basic-short-space | args:opt name n   | -n foo       | foo      |      0 | $(t test:opt:smoke:basic-short-space)
+optional-absent   | args:opt name n   | *(none)*     | ""       |      0 | $(t test:opt:smoke:optional-absent)
+
+### Acceptance Tests
+Scenario                | Invocation                       | Arguments     | Expected             | Status | ✓/✗
+------------------------|----------------------------------|---------------|----------------------|--------|----
+long-equals             | args:opt name n                  | --name=foo    | foo                  |      0 | $(t test:opt:accept:long-equals)
+short-attached          | args:opt name n                  | -nfoo         | foo                  |      0 | $(t test:opt:accept:short-attached)
+required-found          | args:opt -r name n               | --name foo    | foo                  |      0 | $(t test:opt:accept:required-found)
+required-missing        | args:opt -r name n               | *(none)*      | -                    |      1 | $(t test:opt:accept:required-missing)
+required-err-msg        | args:opt -r name n --err "..."   | *(none)*      | stderr               |      1 | $(t test:opt:accept:required-err-msg)
+pattern-match           | args:opt port p '^[0-9]+\$'      | --port 8080   | 8080                 |      0 | $(t test:opt:accept:pattern-match)
+pattern-mismatch        | args:opt port p '^[0-9]+\$'      | --port abc    | -                    |      1 | $(t test:opt:accept:pattern-mismatch)
+long-only               | args:opt name ""                 | --name foo    | foo                  |      0 | $(t test:opt:accept:long-only)
+long-only-ignores-short | args:opt name ""                 | -n foo        | "", ARGS=(-n foo)    |      0 | $(t test:opt:accept:long-only-ignores-short)
+capture-group           | args:opt ord o '^:([0-9]{3})\$'  | --ord :100    | 100                  |      0 | $(t test:opt:accept:capture-group)
+
+### Regression Tests
+Scenario                        | Invocation                             | Arguments            | Expected              | Status | ✓/✗
+--------------------------------|----------------------------------------|----------------------|-----------------------|--------|----
+empty-via-equals                | args:opt name n                        | --name=              | ""                    |      0 | $(t test:opt:regress:empty-via-equals)
+empty-via-space                 | args:opt name n                        | --name ""            | ""                    |      0 | $(t test:opt:regress:empty-via-space)
+mixed-args                      | args:opt name n                        | --name foo --other   | foo, ARGS=(--other)   |      0 | $(t test:opt:regress:mixed-args)
+opt-after-other                 | args:opt name n                        | --other --name foo   | foo, ARGS=(--other)   |      0 | $(t test:opt:regress:opt-after-other)
+missing-value-eol               | args:opt name n '^.+\$'                | --name               | -                     |      1 | $(t test:opt:regress:missing-value-eol)
+short-attached-pattern-match    | args:opt port p '^[0-9]+\$'            | -p8080               | 8080                  |      0 | $(t test:opt:regress:short-attached-pattern-match)
+short-attached-pattern-mismatch | args:opt port p '^[0-9]+\$'            | -pabc                | -                     |      1 | $(t test:opt:regress:short-attached-pattern-mismatch)
+pattern-with-err-msg            | args:opt port p '^[0-9]+\$' --err "..."| --port abc           | stderr                |      1 | $(t test:opt:regress:pattern-with-err-msg)
+
+---
+
+## args:arg
+
+### Smoke Tests
+Scenario         | Invocation         | Arguments | Expected | Status | ✓/✗
+-----------------|--------------------|-----------|----------|--------|----
+basic-positional | args:arg file      | foo       | foo      |      0 | $(t test:arg:smoke:basic-positional)
+required-missing | args:arg file      | *(none)*  | -        |      1 | $(t test:arg:smoke:required-missing)
+optional-missing | args:arg -o file   | *(none)*  | ""       |      0 | $(t test:arg:smoke:optional-missing)
+
+### Acceptance Tests
+Scenario                  | Invocation                       | Arguments             | Expected          | Status | ✓/✗
+--------------------------|----------------------------------|-----------------------|-------------------|--------|----
+pattern-match             | args:arg num '^[0-9]+\$'         | 123                   | 123               |      0 | $(t test:arg:accept:pattern-match)
+pattern-mismatch-required | args:arg num '^[0-9]+\$'         | abc                   | -                 |      1 | $(t test:arg:accept:pattern-mismatch-required)
+pattern-mismatch-optional | args:arg -o num '^[0-9]+\$'      | abc                   | "", ARGS=(abc)    |      0 | $(t test:arg:accept:pattern-mismatch-optional)
+required-err-msg          | args:arg file --err "..."        | *(none)*              | stderr            |      1 | $(t test:arg:accept:required-err-msg)
+url-pattern-match         | args:arg url '^https?://'        | https://example.com   | https://...       |      0 | $(t test:arg:accept:url-pattern-match)
+url-pattern-mismatch      | args:arg url '^https?://'        | /local/path           | -                 |      1 | $(t test:arg:accept:url-pattern-mismatch)
+capture-group             | args:arg ord '^:([0-9]{3})\$'    | :100                  | 100               |      0 | $(t test:arg:accept:capture-group)
+
+### Regression Tests
+Scenario                | Invocation                          | Arguments     | Expected               | Status | ✓/✗
+------------------------|-------------------------------------|---------------|------------------------|--------|----
+first-of-many           | args:arg first                      | foo bar baz   | foo, ARGS=(bar baz)    |      0 | $(t test:arg:regress:first-of-many)
+empty-string            | args:arg val                        | ""            | ""                     |      0 | $(t test:arg:regress:empty-string)
+flag-like-value         | args:arg val                        | --flag        | --flag                 |      0 | $(t test:arg:regress:flag-like-value)
+optional-skip-non-match | args:arg -o num '^[0-9]+\$'         | abc 123       | "", ARGS=(abc 123)     |      0 | $(t test:arg:regress:optional-skip-non-match)
+stdin-marker            | args:arg file                       | -             | -                      |      0 | $(t test:arg:regress:stdin-marker)
+pattern-with-err-msg    | args:arg num '^[0-9]+\$' --err "..."| abc           | stderr                 |      1 | $(t test:arg:regress:pattern-with-err-msg)
+
+---
+
+## args:varg
+
+### Smoke Tests
+Scenario         | Invocation           | Arguments | Expected  | Status | ✓/✗
+-----------------|----------------------|-----------|-----------|--------|----
+basic-variadic   | args:varg files      | a b c     | (a b c)   |      0 | $(t test:varg:smoke:basic-variadic)
+required-missing | args:varg files      | *(none)*  | -         |      1 | $(t test:varg:smoke:required-missing)
+optional-missing | args:varg -o files   | *(none)*  | ()        |      0 | $(t test:varg:smoke:optional-missing)
+
+### Acceptance Tests
+Scenario         | Invocation                    | Arguments | Expected   | Status | ✓/✗
+-----------------|-------------------------------|-----------|------------|--------|----
+single-arg       | args:varg files               | single    | (single)   |      0 | $(t test:varg:accept:single-arg)
+required-err-msg | args:varg files --err "..."   | *(none)*  | stderr     |      1 | $(t test:varg:accept:required-err-msg)
+optional-present | args:varg -o files            | a b c     | (a b c)    |      0 | $(t test:varg:accept:optional-present)
+
+### Regression Tests
+Scenario         | Invocation        | Arguments         | Expected            | Status | ✓/✗
+-----------------|-------------------|-------------------|---------------------|--------|----
+empty-strings    | args:varg vals    | "" "" ""          | ("" "" "")          |      0 | $(t test:varg:regress:empty-strings)
+flag-like-values | args:varg vals    | --flag -x value   | (--flag -x value)   |      0 | $(t test:varg:regress:flag-like-values)
+preserves-spaces | args:varg vals    | a "b c" d         | (a "b c" d)         |      0 | $(t test:varg:regress:preserves-spaces)
+
+---
+
+## Integration Tests
+
+Scenario                 | Invocation                | Arguments                  | Expected        | Status | ✓/✗
+-------------------------|---------------------------|----------------------------|-----------------|--------|----
+flag-opt-arg             | flag v; opt n; arg file   | -v --name foo bar          | all parsed      |      0 | $(t test:int:flag-opt-arg)
+order-independence       | flag v; opt n; arg file   | bar --name foo -v          | all parsed      |      0 | $(t test:int:order-independence)
+opt-arg-patterns         | opt url; arg path         | --url https://x.com /path  | both matched    |      0 | $(t test:int:opt-arg-patterns)
+flag-varg                | flag v; varg files        | -v a b c                   | verbose + files |      0 | $(t test:int:flag-varg)
+duplicate-opts-last-wins | opt name n                | --name foo --name bar      | bar (last)      |      0 | $(t test:int:duplicate-opts-last-wins)
+early-exit-required      | flag v; opt -r name n     | *(none)*                   | early exit      |      1 | $(t test:int:early-exit-required)
+
+---
+
+## Edge Cases
+
+Scenario          | Invocation        | Arguments            | Expected    | Status | ✓/✗
+------------------|-------------------|----------------------|-------------|--------|----
+special-chars     | args:opt name n   | --name 'foo;bar'     | foo;bar     |      0 | $(t test:edge:special-chars)
+newline-in-value  | args:opt name n   | --name \$'foo\\nbar' | foo\\nbar   |      0 | $(t test:edge:newline-in-value)
+unicode           | args:opt name n   | --name '日本語'      | 日本語      |      0 | $(t test:edge:unicode)
+equals-in-value   | args:opt name n   | --name=foo=bar       | foo=bar     |      0 | $(t test:edge:equals-in-value)
+spaces-via-equals | args:opt name n   | --name='foo bar'     | foo bar     |      0 | $(t test:edge:spaces-via-equals)
+hyphen-value      | args:opt name n   | --name -             | -           |      0 | $(t test:edge:hyphen-value)
+
+MD
+
+summary;
