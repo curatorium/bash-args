@@ -1,0 +1,30 @@
+#!/bin/bash
+# Copyright (c) 2025 Mihai Stancu (https://github.com/curatorium)
+
+source /usr/local/bin/bash-import;
+
+DOCFILE="$(dirname ${BASH_SOURCE[0]})/../bash-args.sh";
+export DOCFILE;
+
+T=$'\t'
+
+cat <<-TXT
+	NAME
+		${T}args -- Argument parsing functions for bash scripts.
+
+	USAGE
+		${T}source ./bash-args.sh
+
+	FUNCTIONS
+TXT
+
+for name in $(docs:list function); do
+	cat <<-TXT | awk 'NF{print; blank=0} !NF && !blank++{print ""}'
+		args:$name -- $(docs:tag "$name" desc)
+
+		$(docs:tag -i 1 "$name" usage)
+
+		$(docs:tag -i 1 "$name" flag,opt,arg)
+
+	TXT
+done | sed 's/^/\t/'

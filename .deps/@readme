@@ -1,0 +1,158 @@
+#!/bin/bash
+# Copyright (c) 2025 Mihai Stancu (https://github.com/curatorium)
+
+source /usr/local/bin/bash-import;
+
+DOCFILE="$(dirname ${BASH_SOURCE[0]})/../bash-args.sh"
+
+BEGIN_CODE='```bash'
+END_CODE='```'
+
+# Generate README.md
+cat <<-MD
+	# bash-args
+
+	> Argument parsing for bash scripts.
+
+	## Installation
+
+	$BEGIN_CODE
+	curl -1fsSLR https://github.com/curatorium/bash-args/releases/latest/download/bash-args.sh -o .deps/bash-args.sh
+	$END_CODE
+
+	## Usage
+
+	$BEGIN_CODE
+	$(cat examples/usage.sh)
+	$END_CODE
+
+	All functions operate on the \`ARGS\` array, consuming matched tokens and leaving unmatched ones for subsequent parsing. **Parsing order matters** — follow the numbering above.
+
+	Ideally inside functions you will be using \`local\` variables to avoid polluting the global scope.
+
+	### Why This Order
+
+	| Step | Reason |
+	|------|--------|
+	| \`args:sub\` first | Splits at the subcommand word. Parent parsers (steps 2-6) only see tokens before the boundary. |
+	| \`args:flag\` / \`args:opt\` before \`args:flag --bundle\` | Flags and options each match their own token patterns, so their relative order is interchangeable. Both must run before bundled flags — otherwise \`-nfoo\` could be misread as combined flags instead of an option value. |
+	| \`args:flag --bundle\` before \`args:arg\` | Combined short flags (\`-vfs\`) start with \`-\`. Since \`args:arg\` doesn't skip dash-prefixed tokens, it would capture them as positional values. Clean all flags/options first so only true positionals remain. |
+	| \`args:arg\` before \`args:varg\` | Takes the first remaining positional. Must run before \`args:varg\` sweeps everything. |
+	| \`args:varg\` always last | Sweeps all remaining tokens. Anything parsed after \`args:varg\` would find \`ARGS\` empty. |
+
+	## FUNCTIONS
+
+	**Parameter order matters.** Each function parses its own parameters positionally — pass them in the exact order shown in the usage line.
+MD
+
+for name in $(docs:list function); do
+	cat <<-MD
+
+		### \`args:$name\`
+
+		$(docs:tag "$name" desc)
+
+	MD
+
+	if [[ -n "$(docs:tag "$name" usage)" ]]; then
+		cat <<-MD
+			$BEGIN_CODE
+			$(docs:tag "$name" usage)
+			$END_CODE
+
+		MD
+	fi
+
+	if [[ -n "$(docs:tag -f md "$name" flag,arg,opt)" ]]; then
+		cat <<-MD
+			| Parameter | Description |
+			|-----------|-------------|
+			$(docs:tag -f md "$name" flag,arg,opt)
+
+		MD
+	fi
+
+	if [[ -n "$(docs:tag -f md "$name" return)" ]]; then
+		cat <<-MD
+			| Return | Description |
+			|--------|-------------|
+			$(docs:tag -f md "$name" return)
+
+		MD
+	fi
+done
+
+cat <<-MD
+
+	## Pattern Matching
+
+	Options and arguments support RegEx patterns for validation:
+
+	$BEGIN_CODE
+	# Numeric validation
+	args:opt port p '^[0-9]+\$'
+
+	# URL validation
+	args:arg url '^https?://'
+
+	# Capture groups extract specific parts
+	args:opt ord o '^:([0-9]{3})\$'    # --ord :100 -> ord=100
+	$END_CODE
+
+	When a pattern contains a capture group, the captured value is assigned to the variable instead of the full match.
+
+	## Examples
+
+	### Basic CLI Tool
+
+	$BEGIN_CODE
+	$(cat examples/basic-cli.sh)
+	$END_CODE
+
+	### Git-like Subcommands
+
+	$BEGIN_CODE
+	$(cat examples/git-subcommands.sh)
+	$END_CODE
+
+	### Subcommand with Boundary Separation
+
+	$BEGIN_CODE
+	$(cat examples/subcommand-boundary.sh)
+	$END_CODE
+
+	$BEGIN_CODE
+	\$ mytool --verbose clone --verbose --branch main repo-url
+	verbose mode
+	# parent --verbose ✓, clone gets its own --verbose + --branch main + repo-url
+	$END_CODE
+
+	### End-of-Options Separator
+
+	$BEGIN_CODE
+	$(cat examples/end-of-options.sh)
+	$END_CODE
+
+	The \`--\` separator stops \`args:flag\` and \`args:opt\` from scanning past it. Then \`args:varg\` consumes \`--\` and captures everything that remains.
+
+	$BEGIN_CODE
+	\$ rm --recursive --output log.txt -- --weird-filename -rf
+	# recursive=true, output=log.txt, files=(--weird-filename -rf)
+	$END_CODE
+
+	### With Validation
+
+	$BEGIN_CODE
+	$(cat examples/validation.sh)
+	$END_CODE
+
+	## Limitations
+
+	- **No attached quoting.** Values with spaces must be passed as separate shell words (e.g., \`--name "foo bar"\`). Attached forms like \`--name="foo bar"\` may not preserve quoting as expected.
+	- **\`args:flag --bundle\` ordering.** \`args:flag --bundle\` must be called after all \`args:flag\` and \`args:opt\` calls, but before \`args:arg\` calls. Otherwise, combined flags may consume characters intended as option values, or positional arguments starting with \`-\` may be misinterpreted.
+	- **Subcommand detection is pattern-based.** \`args:sub\` finds the first token matching the pattern. If a parent option's value happens to match the subcommand pattern (e.g., \`--name clone clone ...\`), the value will be detected as the subcommand instead.
+
+	## License
+
+	MIT
+MD
