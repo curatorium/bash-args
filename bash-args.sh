@@ -24,7 +24,7 @@ function args:flag() {
 	local required="false"; [[ "${1:-}" == "-r" || "${1:-}" == "--required" ]] && required="true" && shift;
 	local bundle="false";   [[ "${1:-}" == "-b" || "${1:-}" == "--bundle" ]] && bundle="true" && shift;
 	local count="false";    [[ "${1:-}" == "--count" ]] && count="true" && shift;
-	local -n value="${1//[^_0-9a-zA-Z]/_}";
+	local -n __value_="${1//[^_0-9a-zA-Z]/_}";
 	local long="${1?ERROR: args:flag requires <long>}";   shift;
 	local short="${1?ERROR: args:flag requires <short>}"; shift;
 
@@ -45,8 +45,8 @@ function args:flag() {
 	fi
 
 	# Flag when --count value=$hits otherwise value=true
-	((hits > 0)) && value="true";
-	[[ "$count" == "true" ]] && value="$hits";
+	((hits > 0)) && __value_="true";
+	[[ "$count" == "true" ]] && __value_="$hits";
 
   # Flag found or optional and absent.
 	((hits > 0)) || [[ "$required" == "false" ]] && return 0;
@@ -79,7 +79,7 @@ function args:opt() {
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local required="false"; [[ "${1:-}" == "-r" || "${1:-}" == "--required" ]] && required="true" && shift;
 	local accumulate="false"; [[ "${1:-}" == "-a" || "${1:-}" == "--accumulate" ]] && accumulate="true" && shift;
-	local -n value="${1?ERROR: args:opt requires <long>}";
+	local -n __value_="${1?ERROR: args:opt requires <long>}";
 	local long="${1}"; shift;
 	local short="${1?ERROR: args:opt requires <short>}"; shift;
 	local pattern="${1:-(.*)}"; shift || true;
@@ -89,10 +89,7 @@ function args:opt() {
 
 	# Scan all args and accumulate $values
 	local rc=0 captured values=();
-	while true; do
-		args::capture captured "$scan" "$pattern";
-		rc=$?;
-		((rc == 0)) || break;
+	while args::capture captured "$scan" "$pattern" || { rc=$?; false; }; do
 		values+=("$captured");
 	done
 
@@ -100,8 +97,8 @@ function args:opt() {
 	((rc == 2)) && { [[ -n "$err" ]] && echo "$err" >&2; return 1; };
 
 	# Opt when --accumulate value=$values otherwise value=$values[0]
-	((${#values[@]} > 0)) && value="${values[0]}";
-	[[ "$accumulate" == "true" ]] && value=("${values[@]}");
+	((${#values[@]} > 0)) && __value_="${values[0]}";
+	[[ "$accumulate" == "true" ]] && __value_=("${values[@]}");
 
 	# Option found and matches, or absent and optional.
 	((${#values[@]} > 0)) || [[ "$required" == "false" ]] && return 0;
@@ -132,7 +129,7 @@ function args:arg() {
 
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n value="${1?ERROR: args:arg requires <name>}"; shift;
+	local -n __value_="${1?ERROR: args:arg requires <name>}"; shift;
 	local pattern="${1:-(.*)}"; shift || true;
 
 	[[ "${TOKENS[0]:-}" == "--" ]] && TOKENS=("${TOKENS[@]:1}");
@@ -151,7 +148,7 @@ function args:arg() {
 	fi
 
 	# shellcheck disable=SC2178  # nameref assigned a string
-	value="${BASH_REMATCH[1]:-$captured}";
+	__value_="${BASH_REMATCH[1]:-$captured}";
 
 	# rewrite the $TOKENS array without the captured tokens
 	TOKENS=("${TOKENS[@]:1}");
@@ -177,7 +174,7 @@ function args:varg() {
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n value="${1?ERROR: args:varg requires <name>}"; shift;
+	local -n __value_="${1?ERROR: args:varg requires <name>}"; shift;
 
 	[[ "${TOKENS[0]:-}" == "--" ]] && TOKENS=("${TOKENS[@]:1}");
 
@@ -187,7 +184,7 @@ function args:varg() {
 		return 1;
 	fi
 
-	value=("${TOKENS[@]}");
+	__value_=("${TOKENS[@]}");
 
 	# rewrite the $TOKENS array without the captured tokens
 	TOKENS=();
@@ -215,8 +212,8 @@ function args:sub() {
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n value="${1?ERROR: args:sub requires <name>}"; shift;
-	local -n rest="${1?ERROR: args:sub requires <rest>}"; shift;
+	local -n __value_="${1?ERROR: args:sub requires <name>}"; shift;
+	local -n __rest_="${1?ERROR: args:sub requires <rest>}"; shift;
 	local pattern="${1?ERROR: args:sub requires <pattern>}"; shift;
 
 	local i captured;
@@ -226,8 +223,8 @@ function args:sub() {
 		[[ ! "$captured" =~ $pattern ]] && continue;
 
 		# shellcheck disable=SC2178  # nameref assigned a string
-		value="${BASH_REMATCH[1]:-$captured}";
-		rest=("${TOKENS[@]:i+1}");
+		__value_="${BASH_REMATCH[1]:-$captured}";
+		__rest_=("${TOKENS[@]:i+1}");
 		TOKENS=("${TOKENS[@]:0:i}");
 		return 0;
 	done
@@ -254,7 +251,7 @@ function args::capture() {
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
 	local -n TOKENS="ARGS";
 
-	local -n ref="${1}";   shift;
+	local -n __ref_="${1}";   shift;
 	local    tok="${1}";   shift;
 	local    pat="${1:-}"; shift
 
@@ -270,7 +267,7 @@ function args::capture() {
 
 		# Flag matched (no value pattern provided)
 		# shellcheck disable=SC2034  # ref is a nameref, assigned for the caller
-		[[ -z "$pat" ]] && ref="$token" && TOKENS=("${tokens[@]}" "${TOKENS[@]:i+1}") && return 0;
+		[[ -z "$pat" ]] && __ref_="$token" && TOKENS=("${tokens[@]}" "${TOKENS[@]:i+1}") && return 0;
 
 		# Value attached to option -o123 or --opt=123
 		value="${BASH_REMATCH[1]:-${BASH_REMATCH[2]:-}}";
@@ -279,7 +276,7 @@ function args::capture() {
 
 		# Value must match this pattern.
 		# shellcheck disable=SC2034  # ref is a nameref, assigned for the caller
-		[[ "$value" =~ $pat ]] && ref="${BASH_REMATCH[1]:-$value}" && TOKENS=("${tokens[@]}" "${TOKENS[@]:i+1}") && return 0;
+		[[ "$value" =~ $pat ]] && __ref_="${BASH_REMATCH[1]:-$value}" && TOKENS=("${tokens[@]}" "${TOKENS[@]:i+1}") && return 0;
 
 		# Value found but didn't match pattern.
 		TOKENS=("${tokens[@]}" "${TOKENS[@]:i+1}");

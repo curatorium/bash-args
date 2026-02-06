@@ -74,17 +74,21 @@ args:flag [-r|--required] [-b|--bundle] [--count] <long> <short> [--err <msg>]
 
 | Parameter | Description |
 |-----------|-------------|
-| `[-r\|--required]` | Make the flag required. |
-| `[-b\|--bundle]` | Also match within combined short flags (e.g., -vfs). Requires <short>. |
-| `[--count]` | Count occurrences instead of setting a boolean. Variable will be set to the number of matches (0 if absent). |
-| `<long>` | Long name of the flag (also used as variable name). |
-| `<short>` | Short (1 letter) name of the flag. Use "" for long-only. |
-| `[--err <msg>]` | Error message printed to stderr on failure. |
+| Parameter          | Description                                                                                                  |
+|--------------------|--------------------------------------------------------------------------------------------------------------|
+| `[-r\|--required]` | Make the flag required.                                                                                      |
+| `[-b\|--bundle]`   | Also match within combined short flags (e.g., -vfs). Requires <short>.                                       |
+| `[--count]`        | Count occurrences instead of setting a boolean. Variable will be set to the number of matches (0 if absent). |
+| `<long>`           | Long name of the flag (also used as variable name).                                                          |
+| `<short>`          | Short (1 letter) name of the flag. Use "" for long-only.                                                     |
+| `[--err <msg>]`    | Error message printed to stderr on failure.                                                                  |
 
 | Return | Description |
 |--------|-------------|
-| `0` | Flag found or optional and absent. |
-| `1` | Flag absent and required. |
+| Parameter | Description                        |
+|-----------|------------------------------------|
+| `0`       | Flag found or optional and absent. |
+| `1`       | Flag absent and required.          |
 
 
 ### `args:opt`
@@ -97,17 +101,21 @@ args:opt [-r|--required] [-a|--accumulate] <long> <short> [pattern] [--err <msg>
 
 | Parameter | Description |
 |-----------|-------------|
-| `[-r\|--required]` | Make the option required. |
+| Parameter            | Description                                                                                        |
+|----------------------|----------------------------------------------------------------------------------------------------|
+| `[-r\|--required]`   | Make the option required.                                                                          |
 | `[-a\|--accumulate]` | Collect all occurrences into an array instead of last-wins. Variable must be declared as an array. |
-| `<long>` | Long name of the option (also used as variable name). |
-| `<short>` | Short (1 letter) name of the option. Use "" for long-only. |
-| `[pattern]` | RegEx pattern to validate value. Default "(.*)". |
-| `[--err <msg>]` | Error message printed to stderr on failure. |
+| `<long>`             | Long name of the option (also used as variable name).                                              |
+| `<short>`            | Short (1 letter) name of the option. Use "" for long-only.                                         |
+| `[pattern]`          | RegEx pattern to validate value. Default "(.*)".                                                   |
+| `[--err <msg>]`      | Error message printed to stderr on failure.                                                        |
 
 | Return | Description |
 |--------|-------------|
-| `0` | Option found and matches, or absent and optional. |
-| `1` | Option absent and required, or found and mismatched. |
+| Parameter | Description                                          |
+|-----------|------------------------------------------------------|
+| `0`       | Option found and matches, or absent and optional.    |
+| `1`       | Option absent and required, or found and mismatched. |
 
 
 ### `args:arg`
@@ -120,15 +128,19 @@ args:arg [-o|--optional] <name> [pattern] [--err <msg>]
 
 | Parameter | Description |
 |-----------|-------------|
-| `[-o\|--optional]` | Make the argument optional. |
-| `<name>` | Variable name to assign the captured value. |
-| `[pattern]` | RegEx pattern to validate value. Default "(.*)". |
-| `[--err <msg>]` | Error message printed to stderr on failure. |
+| Parameter          | Description                                      |
+|--------------------|--------------------------------------------------|
+| `[-o\|--optional]` | Make the argument optional.                      |
+| `<name>`           | Variable name to assign the captured value.      |
+| `[pattern]`        | RegEx pattern to validate value. Default "(.*)". |
+| `[--err <msg>]`    | Error message printed to stderr on failure.      |
 
 | Return | Description |
 |--------|-------------|
-| `0` | Argument found and matches, or absent and optional. |
-| `1` | Argument absent and required, or found and mismatched. |
+| Parameter | Description                                            |
+|-----------|--------------------------------------------------------|
+| `0`       | Argument found and matches, or absent and optional.    |
+| `1`       | Argument absent and required, or found and mismatched. |
 
 
 ### `args:varg`
@@ -141,14 +153,18 @@ args:varg [-o|--optional] <name> [--err <msg>]
 
 | Parameter | Description |
 |-----------|-------------|
-| `[-o\|--optional]` | Make the arguments optional. |
-| `<name>` | Array variable name to capture rest values. |
-| `[--err <msg>]` | Error message printed to stderr on failure. |
+| Parameter          | Description                                 |
+|--------------------|---------------------------------------------|
+| `[-o\|--optional]` | Make the arguments optional.                |
+| `<name>`           | Array variable name to capture rest values. |
+| `[--err <msg>]`    | Error message printed to stderr on failure. |
 
 | Return | Description |
 |--------|-------------|
-| `0` | At least one argument found, or optional and none found. |
-| `1` | No arguments and required. |
+| Parameter | Description                                              |
+|-----------|----------------------------------------------------------|
+| `0`       | At least one argument found, or optional and none found. |
+| `1`       | No arguments and required.                               |
 
 
 ### `args:sub`
@@ -161,16 +177,20 @@ args:sub [-o|--optional] <name> <rest> <pattern> [--err <msg>]
 
 | Parameter | Description |
 |-----------|-------------|
-| `[-o\|--optional]` | Make the subcommand optional. |
-| `<name>` | Variable name to assign the subcommand name. |
-| `<rest>` | Array variable name to capture arguments after the subcommand. |
-| `<pattern>` | RegEx pattern to match the subcommand. |
-| `[--err <msg>]` | Error message printed to stderr on failure. |
+| Parameter          | Description                                                    |
+|--------------------|----------------------------------------------------------------|
+| `[-o\|--optional]` | Make the subcommand optional.                                  |
+| `<name>`           | Variable name to assign the subcommand name.                   |
+| `<rest>`           | Array variable name to capture arguments after the subcommand. |
+| `<pattern>`        | RegEx pattern to match the subcommand.                         |
+| `[--err <msg>]`    | Error message printed to stderr on failure.                    |
 
 | Return | Description |
 |--------|-------------|
-| `0` | Subcommand found, or optional and absent. |
-| `1` | Subcommand absent and required, or found and mismatched. |
+| Parameter | Description                                              |
+|-----------|----------------------------------------------------------|
+| `0`       | Subcommand found, or optional and absent.                |
+| `1`       | Subcommand absent and required, or found and mismatched. |
 
 
 ## Pattern Matching

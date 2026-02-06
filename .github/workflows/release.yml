@@ -14,16 +14,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          curl -1fsSLR https://github.com/curatorium/bash-import/releases/latest/download/bash-import -o /usr/local/bin/bash-import;
-          chmod +x /usr/local/bin/bash-import;
-          curl -1fsSLR https://github.com/curatorium/bash-import/releases/latest/download/bash-test -o /usr/local/bin/bash-test;
-          chmod +x /usr/local/bin/bash-test;
-
-      - name: Run checks (shellcheck + tests)
-        run: .githooks/pre-commit
+          sudo curl -1fsSLR https://github.com/curatorium/bash-import/releases/latest/download/bash-import -o /usr/local/bin/bash-import;
+          sudo chmod +x /usr/local/bin/bash-import;
+          sudo curl -1fsSLR https://github.com/curatorium/bash-import/releases/latest/download/bash-test -o /usr/local/bin/bash-test;
+          sudo chmod +x /usr/local/bin/bash-test;
 
       - name: Build release artifacts
         run: bash-import pack bash-args.sh -o .dist/bash-args.sh
+
+      - name: Run checks (shellcheck + tests)
+        run: .githooks/pre-commit
 
       - name: Create release
         env:
