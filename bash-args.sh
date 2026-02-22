@@ -31,14 +31,14 @@ function args:flag() {
 	local scan; [[ -z "$short" ]] && scan="^--${long}$" || scan="^-${short}$|^--${long}$";
 
 	local hit hits=0;
-	while args::capture hit "$scan"; do ((hits++)); done
+	while args::capture hit "$scan"; do ((++hits)); done
 
 	# Bundle: also match within combined short flags (-vfs)
 	if [[ "$bundle" == "true" && -n "$short" ]]; then
 		local bscan="^-[^-]*${short}";
 		local rest;
 		while args::capture hit "$bscan"; do
-			((hits++));
+			((++hits));
 			rest="${hit//$short/}"; rest="${rest#-}";
 			TOKENS=(${rest:+-$rest} "${TOKENS[@]}");
 		done
