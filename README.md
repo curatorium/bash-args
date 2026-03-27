@@ -320,7 +320,7 @@ function main() {
 main "$@"
 ```
 
-The `--` separator stops `args:flag` and `args:opt` from scanning past it. Then `args:varg` consumes `--` and captures everything that remains.
+The `--` separator stops `args:flag` and `args:opt` from scanning past it — they will not match tokens beyond that point. Then `args:arg` and `args:varg` consume `--` itself and capture everything that remains, allowing flag-like values (e.g., `--weird-filename`, `-rf`) to be treated as positional arguments.
 
 ```bash
 $ rm --recursive --output log.txt -- --weird-filename -rf
