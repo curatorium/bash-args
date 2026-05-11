@@ -79,7 +79,12 @@ function args:opt() {
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local required="false"; [[ "${1:-}" == "-r" || "${1:-}" == "--required" ]] && required="true" && shift;
 	local accumulate="false"; [[ "${1:-}" == "-a" || "${1:-}" == "--accumulate" ]] && accumulate="true" && shift;
-	local -n __value_="${1?ERROR: args:opt requires <long>}";
+	[[ -n "${1:-}" ]] || { echo "ERROR: args:opt requires <long>" >&2; return 1; };
+	# Strip non-alphanumeric chars (hyphens, dots) from the nameref target so
+	# hyphenated long flags like `--gh-source` can map to caller-declared
+	# variables like `local gh_source`. The unsanitized form is kept below for
+	# the `$long` flag-name scan pattern.
+	local -n __value_="${1//[^_0-9a-zA-Z]/_}";
 	local long="${1}"; shift;
 	local short="${1?ERROR: args:opt requires <short>}"; shift;
 	local pattern="${1:-(.*)}"; shift || true;
@@ -128,8 +133,9 @@ function args:arg() {
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
+	[[ -n "${1:-}" ]] || { echo "ERROR: args:arg requires <name>" >&2; return 1; };
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n __value_="${1?ERROR: args:arg requires <name>}"; shift;
+	local -n __value_="${1//[^_0-9a-zA-Z]/_}"; shift;
 	local pattern="${1:-(.*)}"; shift || true;
 
 	[[ "${TOKENS[0]:-}" == "--" ]] && TOKENS=("${TOKENS[@]:1}");
@@ -173,8 +179,9 @@ function args:varg() {
 
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
+	[[ -n "${1:-}" ]] || { echo "ERROR: args:varg requires <name>" >&2; return 1; };
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n __value_="${1?ERROR: args:varg requires <name>}"; shift;
+	local -n __value_="${1//[^_0-9a-zA-Z]/_}"; shift;
 
 	[[ "${TOKENS[0]:-}" == "--" ]] && TOKENS=("${TOKENS[@]:1}");
 
@@ -211,9 +218,11 @@ function args:sub() {
 
 	local err=""; (($# >= 2)) && [[ "${*: -2:1}" == "--err" ]] && err="${*: -1}" && set -- "${@:1:$#-2}";
 	local optional="false"; [[ "${1:-}" == "-o" || "${1:-}" == "--optional" ]] && optional="true" && shift;
+	[[ -n "${1:-}" ]] || { echo "ERROR: args:sub requires <name>" >&2; return 1; };
 	# shellcheck disable=SC2178  # nameref is a string, points to an array
-	local -n __value_="${1?ERROR: args:sub requires <name>}"; shift;
-	local -n __rest_="${1?ERROR: args:sub requires <rest>}"; shift;
+	local -n __value_="${1//[^_0-9a-zA-Z]/_}"; shift;
+	[[ -n "${1:-}" ]] || { echo "ERROR: args:sub requires <rest>" >&2; return 1; };
+	local -n __rest_="${1//[^_0-9a-zA-Z]/_}"; shift;
 	local pattern="${1?ERROR: args:sub requires <pattern>}"; shift;
 
 	local i captured;

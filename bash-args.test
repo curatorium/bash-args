@@ -51,6 +51,25 @@ test:smoke:opt:absent() {
 	assert "$name" "" || return 1;
 }
 
+test:smoke:opt:hyphenated-long-name() {
+	# Hyphenated long flags (--gh-source) must map to caller-declared
+	# variables (gh_source) -- bash variable names can't contain hyphens, so
+	# the nameref target is sanitized while the flag name is preserved.
+	local ARGS=(--gh-source release);
+	local gh_source;
+	args:opt gh-source "" || return 1;
+	assert "$gh_source" "release" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
+test:smoke:flag:hyphenated-long-name() {
+	local ARGS=(--dry-run);
+	local dry_run;
+	args:flag dry-run "" || return 1;
+	assert "$dry_run" "true" || return 1;
+	assert:array-eq ARGS "" || return 1;
+}
+
 test:smoke:arg:positional() {
 	local ARGS=(foo);
 	local file;
@@ -1249,6 +1268,8 @@ flag:absent           | flag     | args:flag verbose v                    | *(no
 opt:long-space        | opt      | args:opt name n                        | --name foo                   | foo                                              |      0 | $(t smoke:opt:long-space)
 opt:short-space       | opt      | args:opt name n                        | -n foo                       | foo                                              |      0 | $(t smoke:opt:short-space)
 opt:absent            | opt      | args:opt name n                        | *(none)*                     | ""                                               |      0 | $(t smoke:opt:absent)
+opt:hyphenated        | opt      | args:opt gh-source ""                  | --gh-source release          | release                                          |      0 | $(t smoke:opt:hyphenated-long-name)
+flag:hyphenated       | flag     | args:flag dry-run ""                   | --dry-run                    | true                                             |      0 | $(t smoke:flag:hyphenated-long-name)
 arg:positional        | arg      | args:arg file                          | foo                          | foo                                              |      0 | $(t smoke:arg:positional)
 arg:missing           | arg      | args:arg file                          | *(none)*                     | -                                                |      1 | $(t smoke:arg:missing)
 arg:optional-missing  | arg      | args:arg -o file                       | *(none)*                     | ""                                               |      0 | $(t smoke:arg:optional-missing)

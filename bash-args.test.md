@@ -10,6 +10,8 @@ flag:absent           | flag     | args:flag verbose v                    | *(no
 opt:long-space        | opt      | args:opt name n                        | --name foo                   | foo                                              |      0 | ✅
 opt:short-space       | opt      | args:opt name n                        | -n foo                       | foo                                              |      0 | ✅
 opt:absent            | opt      | args:opt name n                        | *(none)*                     | ""                                               |      0 | ✅
+opt:hyphenated        | opt      | args:opt gh-source ""                  | --gh-source release          | release                                          |      0 | ✅
+flag:hyphenated       | flag     | args:flag dry-run ""                   | --dry-run                    | true                                             |      0 | ✅
 arg:positional        | arg      | args:arg file                          | foo                          | foo                                              |      0 | ✅
 arg:missing           | arg      | args:arg file                          | *(none)*                     | -                                                |      1 | ✅
 arg:optional-missing  | arg      | args:arg -o file                       | *(none)*                     | ""                                               |      0 | ✅
@@ -224,5 +226,5 @@ multiple-args-across-separator | args:arg a1; args:arg a2; args:arg a3          
 
 | ✅ Pass | ❌ Fail | ⚠️ Error |
 |---------|---------|----------|
-| 157 | 0 | 0 |
+| 159 | 0 | 0 |
 
